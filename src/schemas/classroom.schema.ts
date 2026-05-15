@@ -11,6 +11,7 @@ export const createClassroomSchema = z.object({
             .min(1, 'Minimum 1 minute')
             .max(10080, 'Maximum 1 week (10080 minutes)')
             .optional()
-            .default(1440)
+            .default(1440),
+        grade: z.number().int().min(5).max(11).optional().default(11)
     })
 })

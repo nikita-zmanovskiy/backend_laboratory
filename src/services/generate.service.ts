@@ -65,10 +65,21 @@ export class GenerateService {
             }
 
             const normalizedImage = this.normalizeImageInput(input.image)
+            const grade = classroom.grade || 11
+
+            let systemPrompt = 'Ты - помощник для школьников.'
+
+            if (grade <= 6) {
+                systemPrompt += ' Отвечай максимально просто, как для ребенка 11-12 лет. Избегай любых тем связанных с насилием, оружием, политикой, взрослыми отношениями, наркотиками. Если вопрос на запрещенную тему - вежливо откажись и предложи безопасную альтернативу.'
+            } else if (grade <= 8) {
+                systemPrompt += ' Отвечай простым языком для подростков 13-14 лет. Избегай тем насилия, откровенного контента, политических дискуссий. Ограничивай сложность терминологии.'
+            } else if (grade <= 9) {
+                systemPrompt += ' Избегай откровенных тем и детальных описаний насилия. Используй умеренную сложность языка.'
+            }
 
             if (input.mode === 'text') {
                 console.log('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
-                result = await this.gigaChat.generate(input.prompt, normalizedImage)
+                result = await this.gigaChat.generate(input.prompt, normalizedImage,systemPrompt)
 
                 if (result.image_support === false && input.image) {
                     result.warning = 'Image processing is not supported in text mode'

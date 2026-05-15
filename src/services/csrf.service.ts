@@ -44,7 +44,7 @@ export class CsrfService {
             existingData = this.tokenStore.get(effectiveSessionId)
 
         if (existingData) {
-            if (new Date() < existingData.expiresAt) {
+            if (Date.now() < existingData.expiresAt.getTime()) {
                 existingData.lastUsedAt = new Date()
                 return { token: existingData.token, isNew: false }
             } else {
@@ -65,6 +65,33 @@ export class CsrfService {
         })
 
         return { token: newToken, isNew: true }
+    }
+
+    extendTokensForClassroom(classroomCode: string, additionalMinutes: number): void {
+        const additionalMs = additionalMinutes * 60 * 1000
+        let extendedCount = 0
+
+        for (const [, data] of this.tokenStore.entries()) {
+            if (data.classroomCode === classroomCode) {
+                data.expiresAt = new Date(data.expiresAt.getTime() + additionalMs)
+                extendedCount++
+            }
+        }
+
+        console.log(`csrf - Extended ${extendedCount} tokens for classroom ${classroomCode} by ${additionalMinutes}min`)
+    }
+
+    syncTokensExpiryForClassroom(classroomCode: string, expiresAt: Date): void {
+        let syncedCount = 0
+
+        for (const [, data] of this.tokenStore.entries()) {
+            if (data.classroomCode === classroomCode) {
+                data.expiresAt = new Date(expiresAt)
+                syncedCount++
+            }
+        }
+
+        console.log(`csrf - Synced ${syncedCount} tokens for classroom ${classroomCode} to ${expiresAt.toISOString()}`)
     }
 
     validateToken(token: string, sessionId?: string): { valid: boolean; error?: string } {
@@ -124,7 +151,7 @@ export class CsrfService {
         let cleanedCount = 0
 
         for (const [sessionId, data] of this.tokenStore.entries()) {
-            if (now > data.expiresAt) {
+            if (now.getTime() > data.expiresAt.getTime()) {
                 this.tokenStore.delete(sessionId)
                 cleanedCount++
             }

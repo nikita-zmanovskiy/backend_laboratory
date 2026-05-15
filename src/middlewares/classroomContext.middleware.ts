@@ -5,9 +5,6 @@ import {isExpired} from "../utils/moscowTime.js";
 const classroomRepo = new ClassroomRepository()
 
 export const classroomContextMiddleware = async (req: Request, res: Response, next: NextFunction) => {
-    if (!req.path.startsWith('/api/generate')) {
-        return next()
-    }
     if (!req.path.startsWith('/api/generate') || req.path.includes('/images/')) {
         return next()
     }

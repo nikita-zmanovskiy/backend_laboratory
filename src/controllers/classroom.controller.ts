@@ -2,8 +2,8 @@ import type { Request, Response, NextFunction } from 'express'
 import { randomUUID } from 'crypto'
 import { ClassroomRepository } from '../repositories/classroom.repository.js'
 import { AppError } from '../utils/errors.js'
-import {csrfService} from "../routes/csrf.routes.js";
 import {addMinutes} from "../utils/moscowTime.js";
+import { CsrfService } from '../services/csrf.service.js'
 
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
 
@@ -16,13 +16,48 @@ function makeRoomCode(): string {
 }
 
 export class ClassroomController {
-    constructor(private classroomRepo: ClassroomRepository) {}
+    constructor(
+        private classroomRepo: ClassroomRepository,
+        private csrfService: CsrfService
+    ) {}
+
+    join = async (req: Request, res: Response, next: NextFunction) => {
+        try {
+            const code = req.params.code as string
+            const studentId = req.query.student_id as string || `student-${Date.now()}`
+
+            const classroom = await this.classroomRepo.findByCode(code)
+            if (!classroom) {
+                return res.status(404).json({ error: 'Classroom not found' })
+            }
+            if (!classroom.is_active) {
+                return res.status(410).json({ error: 'Classroom is not active' })
+            }
+            if (classroom.expires_at && new Date() > new Date(classroom.expires_at)) {
+                return res.status(410).json({ error: 'Classroom has expired' })
+            }
+
+            const sessionId = `student-${code}-${studentId}`
+            const token = this.csrfService.createToken(sessionId, code, new Date(classroom.expires_at))
+
+            res.json({
+                token: token,
+                classroom_code: code,
+                student_id: studentId,
+                expires_at: classroom.expires_at,
+                message: 'Token valid until classroom expires'
+            })
+        } catch (error) {
+            next(error)
+        }
+    }
 
     create = async (req: Request, res: Response, next: NextFunction) => {
         try {
-            const { title, expires_in_minutes } = req.body as {
+            const { title, expires_in_minutes, grade } = req.body as {
                 title: string
-                expires_in_minutes?: number
+                expires_in_minutes?: number,
+                grade?: number
             }
 
             const existing = await this.classroomRepo.findByTitle(title)
@@ -32,8 +67,9 @@ export class ClassroomController {
                 })
             }
 
-            const expiresInMinutes = expires_in_minutes || 1440
-            const expiresAt = new Date(Date.now() + expiresInMinutes * 60 * 1000)
+            const expiresInMinutes = expires_in_minutes || 1440,
+             expiresAt = new Date(Date.now() + expiresInMinutes * 60 * 1000),
+             classGrade = grade || 11
 
             for (let attempt = 0; attempt < 8; attempt++) {
                 const code = makeRoomCode()
@@ -43,11 +79,17 @@ export class ClassroomController {
                         code,
                         title,
                         expiresAt,
+                        grade: classGrade
                     })
+
+                    // только учительский токен при создании
+                    const teacherSessionId = `teacher-${code}`,
+                     teacherToken = this.csrfService.createToken(teacherSessionId, code, expiresAt)
 
                     console.log('[classroom] created', {
                         code: row.code,
                         title: row.title,
+                        grade: classGrade,
                         expires_at: expiresAt
                     })
 
@@ -57,7 +99,10 @@ export class ClassroomController {
                         title: row.title,
                         is_active: row.is_active,
                         expires_at: row.expires_at,
-                        expires_in_minutes: expiresInMinutes
+                        grade: classGrade,
+                        expires_in_minutes: expiresInMinutes,
+                        teacher_token: teacherToken,
+                        message: 'Students join via GET /api/classrooms/' + code + '/join?student_id=1'
                     })
                 } catch (e: unknown) {
                     const err = e as { code?: string }
@@ -67,6 +112,52 @@ export class ClassroomController {
             }
 
             return res.status(500).json({ error: 'Failed to generate unique code' })
+        } catch (error) {
+            next(error)
+        }
+    }
+
+    extend = async (req: Request, res: Response, next: NextFunction) => {
+        try {
+            const code = req.params.code as string
+            const { additional_minutes } = req.body as { additional_minutes: number }
+
+            if (!additional_minutes || additional_minutes < 1 || additional_minutes > 120) {
+                return res.status(400).json({
+                    error: 'additional_minutes must be between 1 and 120'
+                })
+            }
+
+            const classroom = await this.classroomRepo.findByCode(code)
+            if (!classroom) {
+                return res.status(404).json({ error: 'Classroom not found' })
+            }
+
+            if (!classroom.is_active) {
+                return res.status(410).json({ error: 'Classroom is not active' })
+            }
+
+            if (classroom.expires_at && new Date() > new Date(classroom.expires_at)) {
+                return res.status(410).json({ error: 'Classroom has expired' })
+            }
+
+            const updated = await this.classroomRepo.extend(code, additional_minutes)
+
+            if (!updated) {
+                return res.status(500).json({ error: 'Failed to extend classroom' })
+            }
+
+            if (updated.expires_at) {
+                this.csrfService.syncTokensExpiryForClassroom(code, new Date(updated.expires_at))
+            }
+
+            res.json({
+                code: updated.code,
+                old_expires_at: classroom.expires_at,
+                new_expires_at: updated.expires_at,
+                added_minutes: additional_minutes,
+                message: `Classroom extended by ${additional_minutes} minutes. Tokens also extended.`
+            })
         } catch (error) {
             next(error)
         }

@@ -13,7 +13,5 @@ export const addMinutes = (minutes: number): Date => {
 }
 
 export const isExpired = (expiresAt: Date | string): boolean => {
-    const now = Date.now(),
-     expires = new Date(expiresAt).getTime()
-    return now > expires
+    return Date.now() > new Date(expiresAt).getTime()
 }

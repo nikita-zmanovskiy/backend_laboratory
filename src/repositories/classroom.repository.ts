@@ -44,11 +44,21 @@ export class ClassroomRepository {
         )
         return rows[0] || null
     }
+    async extend(code: string, additionalMinutes: number): Promise<Classroom | null> {
+        const { rows } = await pool.query(`
+            UPDATE classrooms 
+            SET expires_at = expires_at + ($1 || ' minutes')::INTERVAL
+            WHERE UPPER(code) = UPPER($2) AND is_active = true
+            RETURNING *
+        `, [additionalMinutes, code])
 
-    async create(data: { id: string; code: string; title: string; expiresAt: Date | null }) {
+        return rows[0] || null
+    }
+
+    async create(data: { id: string; code: string; title: string; expiresAt: Date | null; grade?: number }) {
         const { rows } = await pool.query(
-            `INSERT INTO classrooms (id, code, title, expires_at) VALUES ($1, $2, $3, $4) RETURNING *`,
-            [data.id, data.code, data.title, data.expiresAt]
+            `INSERT INTO classrooms (id, code, title, expires_at, grade) VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+            [data.id, data.code, data.title, data.expiresAt, data.grade || 11]
         )
         return rows[0]
     }

@@ -5,8 +5,8 @@ export interface Classroom {
     is_active: boolean
     created_at: Date
     expires_at: Date | null
+    grade: number
 }
-
 export interface RequestLog {
     id: number
     timestamp: Date

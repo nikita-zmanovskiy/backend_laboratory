@@ -42,7 +42,7 @@ export class GigaChatService extends BaseAiService {
         this.model = 'GigaChat'
     }
 
-    async generate(prompt: string, image?: string): Promise<any> {
+    async generate(prompt: string, image?: string, systemPrompt?: string): Promise<any> {
         if (config.aiMock) return this.mockGenerate(prompt, image)
 
         if (image && !this.isImagePrompt(prompt)) {
@@ -60,10 +60,15 @@ export class GigaChatService extends BaseAiService {
         }
 
         const messages: GigaChatMessage[] = []
+
+        if (systemPrompt) {
+            messages.push({ role: 'system', content: systemPrompt })
+        }
+
         if (this.isImagePrompt(prompt)) {
             messages.push({
                 role: 'system',
-                content: 'ты художник-иллюстратор. cоздавай изображения по запросу'
+                content: 'Ты — художник-иллюстратор. Создавай изображения по запросу.'
             })
         }
 
@@ -81,7 +86,7 @@ export class GigaChatService extends BaseAiService {
 
         if (this.isImagePrompt(prompt) || (image && this.isImagePrompt(prompt))) {
             requestData.function_call = 'auto'
-            console.log('gigaChat - image generation mode')
+            console.log('[GigaChat] Image generation mode')
         }
 
         return this.withRetry(async () => {
@@ -161,6 +166,44 @@ export class GigaChatService extends BaseAiService {
         })
 
         return Buffer.from(response)
+    }
+
+    async generateWithSystem(prompt: string, systemPrompt: string, image?: string): Promise<any> {
+        if (config.aiMock) return this.mockGenerate(prompt, image)
+
+        const messages: GigaChatMessage[] = [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: prompt }
+        ]
+
+        const requestData: any = {
+            model: this.model,
+            messages: messages,
+            n: 1,
+            stream: false,
+            max_tokens: 2000,
+            repetition_penalty: 1,
+            temperature: 0.7
+        }
+
+        if (this.isImagePrompt(prompt)) {
+            requestData.function_call = 'auto'
+        }
+
+        return this.withRetry(async () => {
+            const token = await this.authService.getAccessToken()
+            const response = await this.makeRequest({
+                method: 'POST',
+                url: '/chat/completions',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                data: requestData
+            })
+            return this.parseResponse(response)
+        })
     }
 
     private isImagePrompt(prompt: string): boolean {
