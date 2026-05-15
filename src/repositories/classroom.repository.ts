@@ -37,6 +37,20 @@ export class ClassroomRepository {
 
         return rows[0] || null
     }
+    async setTeacherToken(id: string, token: string): Promise<void> {
+        await pool.query(
+            'UPDATE classrooms SET teacher_token = $1 WHERE id = $2',
+            [token, id]
+        )
+    }
+
+    async getTeacherToken(code: string): Promise<string | null> {
+        const { rows } = await pool.query(
+            'SELECT teacher_token FROM classrooms WHERE UPPER(code) = UPPER($1)',
+            [code]
+        )
+        return rows[0]?.teacher_token || null
+    }
     async findByTitle(title: string): Promise<Classroom | null> {
         const { rows } = await pool.query(
             'SELECT * FROM classrooms WHERE title = $1 AND is_active = true LIMIT 1',

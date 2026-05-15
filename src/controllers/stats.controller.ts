@@ -1,9 +1,12 @@
 import type { Request, Response, NextFunction } from 'express'
 import { ClassroomService } from '../services/classroom.service.js'
 import { pool } from '../db/pool.js'
+import {ClassroomRepository} from "../repositories/classroom.repository.js";
+import {csrfService} from "../routes/csrf.routes.js";
 
 export class StatsController {
-    constructor(private classroomService: ClassroomService) {}
+    constructor(private classroomService: ClassroomService,
+                private classroomRepo: ClassroomRepository) {}
 
     getClassroomStats = async (req: Request, res: Response, next: NextFunction) => {
         try {
@@ -12,7 +15,23 @@ export class StatsController {
             if (!classroomCode) {
                 return res.status(400).json({ error: 'classroomCode is required' })
             }
+            const classroom = await this.classroomRepo.findByCode(classroomCode)
 
+            if (!classroom) {
+                return res.status(404).json({
+                    error: 'Classroom not found',
+                    hint: 'Check the classroom code or create a new one'
+                })
+            }
+
+            const csrfToken = req.headers['x-csrf-token'] as string
+            const teacherToken = await this.classroomRepo.getTeacherToken(classroomCode)
+
+            if (!teacherToken || csrfToken !== teacherToken) {
+                return res.status(403).json({
+                    error: 'Access denied. Only the teacher who created this classroom can view stats.'
+                })
+            }
             const stats = await this.classroomService.getClassroomStats(classroomCode)
 
             if (!stats || stats.total_requests === 0) {
@@ -53,6 +72,23 @@ export class StatsController {
 
     getGlobalStats = async (req: Request, res: Response, next: NextFunction) => {
         try {
+            const csrfToken = req.headers['x-csrf-token'] as string
+            if (!csrfToken) {
+                return res.status(403).json({
+                    error: 'CSRF token is required',
+                    hint: 'Get token from GET /api/csrf/token'
+                })
+            }
+
+            const validation = csrfService.validateToken(csrfToken)
+
+            if (!validation.valid) {
+                return res.status(403).json({
+                    error: validation.error || 'Invalid or expired CSRF token',
+                    hint: 'Get a new token from GET /api/csrf/token'
+                })
+            }
+
             const { rows } = await pool.query(`
                 SELECT 
                     COUNT(DISTINCT c.id) as total_classrooms,

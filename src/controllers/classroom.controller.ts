@@ -4,6 +4,7 @@ import { ClassroomRepository } from '../repositories/classroom.repository.js'
 import { AppError } from '../utils/errors.js'
 import {addMinutes} from "../utils/moscowTime.js";
 import { CsrfService } from '../services/csrf.service.js'
+import {getWebSocketService} from "../services/websocket.service.js";
 
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
 
@@ -83,8 +84,12 @@ export class ClassroomController {
                     })
 
                     // только учительский токен при создании
-                    const teacherSessionId = `teacher-${code}`,
-                     teacherToken = this.csrfService.createToken(teacherSessionId, code, expiresAt)
+                    // const teacherSessionId = `teacher-${code}`,
+                    //  teacherToken = this.csrfService.createToken(teacherSessionId, code, expiresAt)
+
+                    const creatorToken = req.headers['x-csrf-token'] as string
+
+                    await this.classroomRepo.setTeacherToken(row.id, creatorToken)
 
                     console.log('[classroom] created', {
                         code: row.code,
@@ -101,7 +106,7 @@ export class ClassroomController {
                         expires_at: row.expires_at,
                         grade: classGrade,
                         expires_in_minutes: expiresInMinutes,
-                        teacher_token: teacherToken,
+                        teacher_token: creatorToken,
                         message: 'Students join via GET /api/classrooms/' + code + '/join?student_id=1'
                     })
                 } catch (e: unknown) {
@@ -136,7 +141,14 @@ export class ClassroomController {
             if (!classroom.is_active) {
                 return res.status(410).json({ error: 'Classroom is not active' })
             }
+            const csrfToken = req.headers['x-csrf-token'] as string
+            const teacherToken = await this.classroomRepo.getTeacherToken(code)
 
+            if (!teacherToken || csrfToken !== teacherToken) {
+                return res.status(403).json({
+                    error: 'Access denied. Only the teacher who created this classroom can deactivate it.'
+                })
+            }
             if (classroom.expires_at && new Date() > new Date(classroom.expires_at)) {
                 return res.status(410).json({ error: 'Classroom has expired' })
             }
@@ -178,7 +190,21 @@ export class ClassroomController {
                 return res.status(404).json({ error: 'Classroom not found' })
             }
 
+            const csrfToken = req.headers['x-csrf-token'] as string
+            const teacherToken = await this.classroomRepo.getTeacherToken(code)
+
+            if (!teacherToken || csrfToken !== teacherToken) {
+                return res.status(403).json({
+                    error: 'Access denied. Only the teacher who created this classroom can deactivate it.'
+                })
+            }
+
             await this.classroomRepo.deactivate(classroom.id)
+
+            const wsService = getWebSocketService()
+            if (wsService) {
+                wsService.broadcastClassroomClosed(code, 'deactivated')
+            }
 
             res.json({
                 message: 'Classroom deactivated',

@@ -1,0 +1,1 @@
+ALTER TABLE classrooms ADD COLUMN IF NOT EXISTS teacher_token VARCHAR(64);

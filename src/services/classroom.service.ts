@@ -1,6 +1,7 @@
 import { ClassroomRepository } from '../repositories/classroom.repository.js'
 import { pool } from '../db/pool.js'
 import {getMoscowTime} from "../utils/moscowTime.js";
+import {getWebSocketService} from "./websocket.service.js";
 
 export class ClassroomService {
     constructor(private classroomRepo: ClassroomRepository) {}
@@ -66,7 +67,14 @@ export class ClassroomService {
 
             const rowCount = result.rowCount ?? 0
             if (rowCount > 0) {
-                console.log(`cleanup - deactivated ${rowCount} expired classrooms`)
+               
+                const wsService = getWebSocketService()
+                for (const row of result.rows) {
+                    if (wsService) {
+                        wsService.broadcastClassroomClosed(row.code, 'expired')
+                    }
+                }
+                console.log(`[Cleanup] Deactivated ${rowCount} expired classrooms`)
             }
         } catch (error) {
             console.error('cleanup - error:', error)

@@ -1,6 +1,7 @@
 import type { Request, Response, NextFunction } from 'express'
 import { ClassroomRepository } from '../repositories/classroom.repository.js'
 import {isExpired} from "../utils/moscowTime.js";
+import {getWebSocketService} from "../services/websocket.service.js";
 
 const classroomRepo = new ClassroomRepository()
 
@@ -40,7 +41,12 @@ export const classroomContextMiddleware = async (req: Request, res: Response, ne
         if (classroom.is_active) {
             await classroomRepo.deactivate(classroom.id)
             console.log(`classroom - auto-deactivated expired classroom: ${classroomCode}`)
+            const wsService = getWebSocketService()
+            if (wsService) {
+                wsService.broadcastClassroomClosed(classroomCode, 'expired')
+            }
         }
+
         return res.status(410).json({
             error: 'Classroom has expired',
             expired_at: classroom.expires_at,

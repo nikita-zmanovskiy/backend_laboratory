@@ -20,7 +20,8 @@ export const initDb = async () => {
             'create_classrooms.sql',
             'create_request_logs.sql',
             'add_tokens_approximate.sql',
-            'add_grade.sql'
+            'add_grade.sql',
+            'add_teacher_token.sql'
         ]
 
         for (const migration of migrations) {

@@ -104,6 +104,30 @@ export class WebSocketService {
             }
         })
     }
+    broadcastClassroomClosed(classroomCode: string, reason: string = 'expired'): void {
+        if (!this.wss) return
+
+        const message = JSON.stringify({
+            type: 'classroom_closed',
+            classroom_code: classroomCode,
+            reason: reason,
+            message: reason === 'deactivated'
+                ? 'Учитель завершил урок'
+                : 'Время урока истекло',
+            timestamp: new Date().toISOString()
+        })
+
+        this.clients.forEach((client) => {
+            if (
+                client.ws.readyState === WebSocket.OPEN &&
+                client.classroomCode === classroomCode
+            ) {
+                client.ws.send(message)
+            }
+        })
+
+        console.log(`[WS] Classroom ${classroomCode} closed (${reason}), notified ${this.clients.size} clients`)
+    }
 
     private generateClientId(): string {
         return Math.random().toString(36).substring(2, 15)
