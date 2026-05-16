@@ -2,6 +2,7 @@ import { BaseAiService } from './baseAiService.js'
 import { GigaChatAuthService } from './gigachatAuth.service.js'
 import { GigaChatFilesService } from './gigachatFiles.service.js'
 import { config } from '../../config/env.js'
+import {RequestQueueService} from "./requestQueue.service.js";
 
 interface GigaChatMessage {
     role: 'system' | 'user' | 'assistant'
@@ -33,10 +34,12 @@ interface GigaChatResponse {
 export class GigaChatService extends BaseAiService {
     private authService: GigaChatAuthService
     private filesService: GigaChatFilesService
+    private queue: RequestQueueService
     private model: string
 
     constructor() {
         super('GigaChat', config.gigachat.apiUrl)
+        this.queue = new RequestQueueService(2, 2000)
         this.authService = new GigaChatAuthService()
         this.filesService = new GigaChatFilesService()
         this.model = 'GigaChat'
@@ -88,23 +91,25 @@ export class GigaChatService extends BaseAiService {
             requestData.function_call = 'auto'
             console.log('[GigaChat] Image generation mode')
         }
+        return this.queue.enqueue(async () => {
+            return this.withRetry(async () => {
+                const token = await this.authService.getAccessToken()
 
-        return this.withRetry(async () => {
-            const token = await this.authService.getAccessToken()
+                const response = await this.makeRequest({
+                    method: 'POST',
+                    url: '/chat/completions',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    data: requestData
+                })
 
-            const response = await this.makeRequest({
-                method: 'POST',
-                url: '/chat/completions',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json'
-                },
-                data: requestData
+                return this.parseResponse(response)
             })
-
-            return this.parseResponse(response)
         })
+
     }
 
     private parseResponse(response: GigaChatResponse): any {

@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express'
 import { pool } from '../db/pool.js'
 import {getMoscowISOString} from "../utils/moscowTime.js";
+import {RequestQueueService} from "../services/ai/requestQueue.service.js";
 
 const healthRouter = Router()
 
@@ -28,4 +29,9 @@ healthRouter.get('/', async (req: Request, res: Response) => {
     res.status(statusCode).json(health)
 })
 
+// healthRouter.get('/queue', (req, res) => {
+//     res.json({
+//         queue_size: RequestQueueService.getQueueSize()
+//     })
+// })
 export { healthRouter }
