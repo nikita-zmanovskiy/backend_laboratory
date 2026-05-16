@@ -39,7 +39,7 @@ export class ClassroomController {
             }
 
             const sessionId = `student-${code}-${studentId}`
-            const token = this.csrfService.createToken(sessionId, code, new Date(classroom.expires_at))
+            const token = this.csrfService.createToken(sessionId, code, new Date(classroom.expires_at || Date.now() + 86400000))
 
             res.json({
                 token: token,
@@ -178,7 +178,7 @@ export class ClassroomController {
     deactivate = async (req: Request, res: Response, next: NextFunction) => {
         try {
 
-            const code = req.params.code
+            const code = req.params.code as string
 
             if (!code) {
                 return res.status(400).json({ error: 'Code is required' })
@@ -203,7 +203,7 @@ export class ClassroomController {
 
             const wsService = getWebSocketService()
             if (wsService) {
-                wsService.broadcastClassroomClosed(code, 'deactivated')
+                wsService.broadcastClassroomClosed(code as string, 'deactivated')
             }
 
             res.json({

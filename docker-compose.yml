@@ -1,27 +1,36 @@
 version: '3.8'
 
 services:
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: ai_lab_user
+      POSTGRES_PASSWORD: admin
+      POSTGRES_DB: ai_lab
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+
   backend:
     build: .
     ports:
       - "3000:3000"
     environment:
-      - DATABASE_URL=postgresql://postgres:password@db:5432/lab_ai
-      - PORT=3000
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://ai_lab_user:admin@db:5432/ai_lab
+      PGSSL: "false"
+      GIGACHAT_CLIENT_ID: ${GIGACHAT_CLIENT_ID}
+      GIGACHAT_CLIENT_SECRET: ${GIGACHAT_CLIENT_SECRET}
+      GIGACHAT_AUTH_URL: https://ngw.devices.sberbank.ru:9443/api/v2/oauth
+      GIGACHAT_API_URL: https://gigachat.devices.sberbank.ru/api/v1
+      AI_MOCK: "true"
+      HTTPS: "false"
     depends_on:
       - db
     restart: unless-stopped
-
-  db:
-    image: postgres:15-alpine
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: lab_ai
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
 
   nginx:
     build:
