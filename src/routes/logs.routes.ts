@@ -11,5 +11,5 @@ const logsRouter = Router(),
  logsController = new LogsController(logService, classroomRepo)
 
 logsRouter.get('/', logsController.getLogs)
-
+logsRouter.get('/export', logsController.exportLogs)
 export { logsRouter }

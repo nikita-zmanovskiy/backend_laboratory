@@ -126,7 +126,7 @@ export class WebSocketService {
             }
         })
 
-        console.log(`[WS] Classroom ${classroomCode} closed (${reason}), notified ${this.clients.size} clients`)
+        console.log(`ws - classroom ${classroomCode} closed (${reason}), notified ${this.clients.size} clients`)
     }
 
     private generateClientId(): string {

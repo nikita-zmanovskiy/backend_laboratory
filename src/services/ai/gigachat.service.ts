@@ -61,17 +61,17 @@ export class GigaChatService extends BaseAiService {
 
         const messages: GigaChatMessage[] = []
 
-        if (systemPrompt) {
+        if (systemPrompt && this.isImagePrompt(prompt)) {
             messages.push({ role: 'system', content: systemPrompt })
-        }
-
-        if (this.isImagePrompt(prompt)) {
+        } else if (this.isImagePrompt(prompt)) {
             messages.push({
                 role: 'system',
-                content: 'Ты — художник-иллюстратор. Создавай изображения по запросу.'
+                content: 'Ты - художник-иллюстратор. Создавай изображения по запросу.'
             })
+        } else if (systemPrompt) {
+            messages.push({ role: 'system', content: systemPrompt })
         }
-
+        
         messages.push({ role: 'user', content: prompt })
 
         const requestData: any = {

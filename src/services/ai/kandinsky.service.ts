@@ -4,31 +4,34 @@ import { AppError } from '../../utils/errors.js'
 
 export class KandinskyService extends BaseAiService {
     constructor() {
-        super('Kandinsky', config.kandinsky?.url)
+        super('Kandinsky', config.gigachat.apiUrl)
     }
 
     async generate(prompt: string, image?: string | null) {
-        if (config.aiMock) {
-            return this.mock(prompt, image)
-        }
 
-        const mode = image ? 'image2image' : 'text2image'
-        console.log(`kandinsky - mode: ${mode}`)
+        //todo: УБРАТЬ/АДАПТИРОВАТЬ МЕТОД - пока не ипользуется
+        return
+        // if (config.aiMock) {
+        //     return this.mock(prompt, image)
+        // }
+        //
+        // const mode = image ? 'image2image' : 'text2image'
+        // console.log(`kandinsky - mode: ${mode}`)
+        //
+        // const payload = image
+        //     ? { prompt, image, mode: 'image2image' }
+        //     : { prompt, mode: 'text2image' }
 
-        const payload = image
-            ? { prompt, image, mode: 'image2image' }
-            : { prompt, mode: 'text2image' }
-
-        return this.makeRequestWithRetry({
-            method: 'POST',
-            url: '/generate',
-            headers: {
-                'X-Key': `Key ${config.kandinsky?.key}`,
-                'X-Secret': `Secret ${config.kandinsky?.secret}`,
-                'Content-Type': 'application/json'
-            },
-            data: payload
-        })
+        // return this.makeRequestWithRetry({
+        //     method: 'POST',
+        //     url: '/generate',
+        //     headers: {
+        //         'X-Key': `Key ${config.kandinsky?.key}`,
+        //         'X-Secret': `Secret ${config.kandinsky?.secret}`,
+        //         'Content-Type': 'application/json'
+        //     },
+        //     data: payload
+        // })
     }
 
     private async makeRequestWithRetry(config: any, attempt = 0): Promise<any> {

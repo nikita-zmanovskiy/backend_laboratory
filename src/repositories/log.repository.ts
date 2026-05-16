@@ -14,7 +14,39 @@ export class LogRepository {
 
         return rows
     }
+    async findByClassroomCodePaginated(
+        classroomCode: string,
+        page: number = 1,
+        limit: number = 20
+    ): Promise<{ logs: RequestLog[]; total: number; page: number; totalPages: number }> {
+        const offset = (page - 1) * limit
 
+        const countResult = await pool.query(`
+        SELECT COUNT(*) as total
+        FROM request_logs rl
+        JOIN classrooms c ON rl.classroom_id = c.id
+        WHERE UPPER(c.code) = UPPER($1)
+    `, [classroomCode])
+
+        const total = parseInt(countResult.rows[0].total)
+        const totalPages = Math.ceil(total / limit)
+
+        const { rows } = await pool.query(`
+        SELECT rl.* 
+        FROM request_logs rl
+        JOIN classrooms c ON rl.classroom_id = c.id
+        WHERE UPPER(c.code) = UPPER($1)
+        ORDER BY rl.timestamp DESC
+        LIMIT $2 OFFSET $3
+    `, [classroomCode, limit, offset])
+
+        return {
+            logs: rows,
+            total,
+            page,
+            totalPages
+        }
+    }
     async create(log: Omit<RequestLog, 'id'>): Promise<RequestLog> {
         console.log(log)
         const { rows } = await pool.query(`

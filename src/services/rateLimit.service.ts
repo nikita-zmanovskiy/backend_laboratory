@@ -4,18 +4,81 @@ interface RateLimitEntry {
     blocked: boolean
     blockedUntil: number
 }
+interface BruteForceEntry {
+    failures: number
+    firstFailure: number
+    blocked: boolean
+    blockedUntil: number
+}
 
 export class RateLimitService {
     private store: Map<string, RateLimitEntry>
+    private bruteForceStore: Map<string, BruteForceEntry>
     private readonly MAX_REQUESTS = 10
     private readonly WINDOW_MS = 60000 // блок окна, если за минуту много запросов, то блок
     private readonly BLOCK_DURATION_MS = 120000
 
+    private readonly MAX_FAILURES = 5         // 5 неудачных попыток
+    private readonly BRUTE_BLOCK_MS = 300000  // блокировка на 5 минут
+    private readonly BRUTE_WINDOW_MS = 60000  // в течение 1 минуты
+
     constructor() {
         this.store = new Map()
+        this.bruteForceStore = new Map()
         setInterval(() => this.cleanup(), 60000)
     }
+    checkBruteForce(key: string): { allowed: boolean; reason?: string; retryAfter?: number } {
+        const now = Date.now()
+        let entry = this.bruteForceStore.get(key)
 
+        if (!entry) {
+            entry = { failures: 0, firstFailure: now, blocked: false, blockedUntil: 0 }
+            this.bruteForceStore.set(key, entry)
+        }
+
+        if (entry.blocked) {
+            if (now < entry.blockedUntil) {
+                const remaining = Math.ceil((entry.blockedUntil - now) / 1000)
+                return {
+                    allowed: false,
+                    reason: `Too many failed attempts. Blocked for ${remaining} seconds.`,
+                    retryAfter: remaining
+                }
+            }
+            // разблок
+            entry.blocked = false
+            entry.failures = 0
+            entry.firstFailure = now
+        }
+
+        // проверка окна попыток
+        if (now - entry.firstFailure > this.BRUTE_WINDOW_MS) {
+            entry.failures = 0
+            entry.firstFailure = now
+        }
+
+        return { allowed: true }
+    }
+    recordFailure(key: string): void {
+        let entry = this.bruteForceStore.get(key)
+        if (!entry) {
+            entry = { failures: 0, firstFailure: Date.now(), blocked: false, blockedUntil: 0 }
+            this.bruteForceStore.set(key, entry)
+        }
+
+        entry.failures++
+        console.log(`bruteForce - failure ${entry.failures}/${this.MAX_FAILURES} for ${key}`)
+
+        if (entry.failures >= this.MAX_FAILURES) {
+            entry.blocked = true
+            entry.blockedUntil = Date.now() + this.BRUTE_BLOCK_MS
+            console.warn(`bruteForce - BLOCKED: ${key} after ${entry.failures} failures`)
+        }
+    }
+
+    resetBruteForce(key: string): void {
+        this.bruteForceStore.delete(key)
+    }
     checkRateLimit(key: string): { allowed: boolean; reason?: string; retryAfter?: number } {
         const now = Date.now()
         let entry = this.store.get(key)
@@ -106,6 +169,15 @@ export class RateLimitService {
             }
         }
 
+        // Очистка тех кто заблочен по ip
+        for (const [key, entry] of this.bruteForceStore.entries()) {
+            if (entry.blocked && now > entry.blockedUntil + 600000) {
+                this.bruteForceStore.delete(key)
+            }
+            if (!entry.blocked && (now - entry.firstFailure) > this.BRUTE_WINDOW_MS + 60000) {
+                this.bruteForceStore.delete(key)
+            }
+        }
         if (cleaned > 0) {
             console.log(`rateLimit - cleaned ${cleaned} entries`)
         }

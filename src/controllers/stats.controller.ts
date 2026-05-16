@@ -15,23 +15,18 @@ export class StatsController {
             if (!classroomCode) {
                 return res.status(400).json({ error: 'classroomCode is required' })
             }
-            const classroom = await this.classroomRepo.findByCode(classroomCode)
 
+            const classroom = await this.classroomRepo.findByCode(classroomCode)
             if (!classroom) {
-                return res.status(404).json({
-                    error: 'Classroom not found',
-                    hint: 'Check the classroom code or create a new one'
-                })
+                return res.status(404).json({ error: 'Classroom not found' })
             }
 
             const csrfToken = req.headers['x-csrf-token'] as string
             const teacherToken = await this.classroomRepo.getTeacherToken(classroomCode)
-
             if (!teacherToken || csrfToken !== teacherToken) {
-                return res.status(403).json({
-                    error: 'Access denied. Only the teacher who created this classroom can view stats.'
-                })
+                return res.status(403).json({ error: 'Access denied' })
             }
+
             const stats = await this.classroomService.getClassroomStats(classroomCode)
 
             if (!stats || stats.total_requests === 0) {
@@ -44,32 +39,26 @@ export class StatsController {
                         image_requests: 0,
                         errors: 0,
                         avg_response_time: 0,
-                        active_sessions: 0
+                        active_sessions: 0,
+                        top_students: [],
+                        charts: {
+                            tokens_over_time: [],
+                            requests_per_minute: [],
+                            mode_distribution: { text: 0, image: 0 },
+                            avg_tokens_per_request: 0
+                        }
                     }
                 })
             }
 
             res.json({
                 classroom_code: classroomCode,
-                stats: {
-                    total_requests: stats.total_requests,
-                    text_requests: stats.text_requests,
-                    image_requests: stats.image_requests,
-                    errors: stats.errors,
-                    avg_response_time_ms: stats.avg_response_time,
-                    active_sessions: stats.active_sessions,
-                    first_request: stats.first_request,
-                    last_request: stats.last_request,
-                    error_rate: stats.total_requests > 0
-                        ? ((stats.errors / stats.total_requests) * 100).toFixed(1) + '%'
-                        : '0%'
-                }
+                stats: stats
             })
         } catch (error) {
             next(error)
         }
     }
-
     getGlobalStats = async (req: Request, res: Response, next: NextFunction) => {
         try {
             const csrfToken = req.headers['x-csrf-token'] as string

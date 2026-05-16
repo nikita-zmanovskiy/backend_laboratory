@@ -47,3 +47,11 @@ GIGACHAT_AUTH_URL=https://ngw.devices.sberbank.ru:9443/api/v2/oauth
 GIGACHAT_API_URL=https://gigachat.devices.sberbank.ru/api/v1
 
 AI_MOCK=false
+
+
+
+для теста нагрузки, заменить тесты в package.json 
+"test:load:health": "k6 run tests/load/health-test.js",
+"test:load:csrf": "k6 run tests/load/csrf-test.js",
+"test:load:generate": "k6 run tests/load/generate-test.js",
+"test:load": "npm run test:load:health && npm run test:load:csrf && npm run test:load:generate"

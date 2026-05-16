@@ -32,17 +32,9 @@ export class ClassroomService {
         }
     }
 
-    async getClassroomStats(code: string): Promise<{
-        total_requests: number
-        text_requests: number
-        image_requests: number
-        errors: number
-        avg_response_time: number
-        active_sessions: number
-        first_request: Date | null
-        last_request: Date | null
-    } | null> {
+    async getClassroomStats(code: string) {
         const stats = await this.classroomRepo.getStats(code)
+        console.log(stats)
         return stats
     }
 
@@ -62,7 +54,7 @@ export class ClassroomService {
             SET is_active = false 
             WHERE is_active = true 
             AND expires_at IS NOT NULL 
-            AND expires_at < NOW()  -- Используем NOW() PostgreSQL (UTC)
+            AND expires_at < NOW()  -- UTC
         `)
 
             const rowCount = result.rowCount ?? 0
@@ -74,7 +66,7 @@ export class ClassroomService {
                         wsService.broadcastClassroomClosed(row.code, 'expired')
                     }
                 }
-                console.log(`[Cleanup] Deactivated ${rowCount} expired classrooms`)
+                console.log(`cleanup - deactivated ${rowCount} expired classrooms`)
             }
         } catch (error) {
             console.error('cleanup - error:', error)

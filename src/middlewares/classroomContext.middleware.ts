@@ -2,8 +2,10 @@ import type { Request, Response, NextFunction } from 'express'
 import { ClassroomRepository } from '../repositories/classroom.repository.js'
 import {isExpired} from "../utils/moscowTime.js";
 import {getWebSocketService} from "../services/websocket.service.js";
+import {RateLimitService} from "../services/rateLimit.service.js";
 
 const classroomRepo = new ClassroomRepository()
+const rateLimitService = new RateLimitService()
 
 export const classroomContextMiddleware = async (req: Request, res: Response, next: NextFunction) => {
     if (!req.path.startsWith('/api/generate') || req.path.includes('/images/')) {
@@ -20,17 +22,27 @@ export const classroomContextMiddleware = async (req: Request, res: Response, ne
             hint: 'Provide classroom_code in header (x-classroom-code) or body'
         })
     }
+    const ip = req.ip || req.socket.remoteAddress || 'unknown'
+    const bruteKey = `ip:${ip}:classroom`
+
+    const bruteCheck = rateLimitService.checkBruteForce(bruteKey)
+    if (!bruteCheck.allowed) {
+        return res.status(429).json({ error: bruteCheck.reason })
+    }
 
     if (!/^[A-Z0-9]{6}$/.test(classroomCode)) {
+        rateLimitService.recordFailure(bruteKey)
         return res.status(400).json({
             error: 'Invalid classroom_code format',
             hint: 'Classroom code must be 6 characters (uppercase letters and numbers)'
         })
     }
 
+
     const classroom = await classroomRepo.findByCode(classroomCode)
 
     if (!classroom) {
+        rateLimitService.recordFailure(bruteKey)
         return res.status(404).json({
             error: 'Classroom not found',
             hint: 'Create a new classroom first: POST /api/classrooms'
